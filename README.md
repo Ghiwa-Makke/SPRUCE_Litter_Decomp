@@ -4,7 +4,7 @@ This repository contains the code for the analyses and figures presented in the 
  
 **Litter Identity Drives Molecular Trajectories of Peatland Organic Matter Decomposition Under Warming and Elevated CO<sub>2</sub>**
  
-Data are available in this GitHub repository and in the OSF repository (DOI: *to be added upon publication*). 
+Data are available in this GitHub repository and in the OSF repository (DOI: https://doi.org/10.17605/OSF.IO/CSD9W). 
 
 ---
  
