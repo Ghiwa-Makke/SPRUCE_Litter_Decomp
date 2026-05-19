@@ -8,6 +8,7 @@ library(ggplot2)
 library(viridis)
 library(scales)
 library(purrr)
+library(ragg)
 
 custom_labels <- c(
   "MAG" = "S. magellanicum",
@@ -392,7 +393,7 @@ plot_df <- adonis_per_litter_all %>%
     "Temp:CO2"
   )) %>%
   mutate(
-    Type   = Litter,                    
+    Type   = Litter,
     Factors = recode(
       Term,
       "Pickup_t"          = "Collection time",
@@ -402,8 +403,8 @@ plot_df <- adonis_per_litter_all %>%
       "Pickup_t:CO2"      = "Collection time & CO2",
       "Temp:CO2"          = "Temp & CO2"
     ),
-    Percentage = Percent_explained,     
-    P.value    = `Pr(>F)`,
+    Percentage  = Percent_explained,
+    P.value     = `Pr(>F)`,
     Significance = case_when(
       P.value < 0.001 ~ "***",
       P.value < 0.01  ~ "**",
@@ -413,7 +414,6 @@ plot_df <- adonis_per_litter_all %>%
   ) %>%
   select(Type, Factors, Percentage, P.value, Significance)
 
-# litter and factor order
 sample_order <- c("ANG", "MAG", "LTL", "LTR", "SPL", "SPR")
 factor_order <- c(
   "Collection time",
@@ -430,27 +430,32 @@ plot_df <- plot_df %>%
     Factors = factor(Factors, levels = factor_order)
   )
 
+## axis labels with italics and CO2 ---------------------------------------
 
-
-# Fig 4 -------------------------------------------------------------------
-
-library(ggplot2)
-library(viridis)
-library(scales)
+custom_labels_x_expr <- c(
+  "ANG" = expression(italic("S. angustifolium")),
+  "MAG" = expression(italic("S. magellanicum")),
+  "LTL" = expression("Labrador tea leaves"),
+  "LTR" = expression("Labrador tea roots"),
+  "SPL" = expression("Spruce needles"),
+  "SPR" = expression("Spruce roots")
+)
 
 custom_labels_y <- c(
-  "Collection time"             = "Collection time",
-  "Temp"                    = "Temp",
-  "CO2"                     = expression(CO[2]),
-  "Collection time & Temp"      = "Collection time & Temp",
-  "Collection time & CO2"       = expression("Collection time & " ~ CO[2]),
-  "Temp & CO2"              = expression("Temp & " ~ CO[2])
+  "Collection time"        = "Collection time",
+  "Temp"                   = "Temp",
+  "CO2"                    = expression(CO[2]),
+  "Collection time & Temp" = "Collection time & Temp",
+  "Collection time & CO2"  = expression("Collection time & " ~ CO[2]),
+  "Temp & CO2"             = expression("Temp & " ~ CO[2])
 )
 
 plot_df <- plot_df %>%
   mutate(
     Significance = if_else(P.value < 0.05, "*", "")
   )
+
+## Fig 4 bubble plot ------------------------------------------------------
 
 adonis_plot <- ggplot(plot_df, aes(x = Type, y = Factors)) +
   geom_point(
@@ -462,45 +467,43 @@ adonis_plot <- ggplot(plot_df, aes(x = Type, y = Factors)) +
   geom_text(
     aes(label = Significance),
     color    = "black",
-    size     = 8,
+    size     = 4,
     vjust    = 0.7,
     fontface = "bold",
     na.rm    = TRUE
   ) +
   scale_size_continuous(
     name  = "Variance explained (%)",
-    range = c(6, 20)   # bigger bubbles
+    range = c(3, 10)
   ) +
   scale_fill_gradient(
     name   = "PERMANOVA p-value",
     low    = "#f5f5dc",   # beige
-    high   = "#006d2c",   # dark green
-    #breaks = c(0.001, 0.01, 0.05, 0.1),
-    #labels = c("0.001", "0.01", "0.05", "0.1")
+    high   = "#006d2c"
   ) +
   scale_y_discrete(labels = custom_labels_y) +
-  scale_x_discrete(labels = custom_labels)+
+  scale_x_discrete(labels = custom_labels_x_expr) +
   labs(
-    #title = "Significant drivers of molecular-class composition",
-    x     = "Litter type",
-    y     = NULL
+    x = "Litter type",
+    y = NULL
   ) +
-  theme_minimal(base_size = 14) +
+  theme_minimal(base_size = 10) +
   theme(
-    plot.title       = element_text(hjust = 0.5, face = "bold", size = 14),
+    plot.title       = element_text(hjust = 0, face = "bold", size = 11),
     axis.text.x      = element_text(face = "bold", angle = 30, hjust = 1, vjust = 1),
-    axis.text.y      = element_text(face = "bold", size = 14),
+    axis.text.y      = element_text(face = "bold", size = 9),
     panel.grid.major = element_blank(),
     panel.grid.minor = element_blank(),
-    legend.position  = "right",      
-    legend.box       = "vertical",   
-    #legend.title     = element_text(face = "bold"),
-    legend.text      = element_text(size = 12)
+    legend.position  = "right",
+    legend.box       = "vertical",
+    legend.text      = element_text(size = 8),
+    legend.title     = element_text(size = 9),
+    plot.margin      = margin(t = 5, r = 2, b = 5, l = 5)
   ) +
   guides(
     fill = guide_colorbar(
-      barwidth       = 1,
-      barheight      = 8,
+      barwidth       = 0.4,
+      barheight      = 4,
       title.position = "top",
       title.hjust    = 0.5
     ),
@@ -514,11 +517,13 @@ adonis_plot <- ggplot(plot_df, aes(x = Type, y = Factors)) +
 adonis_plot
 
 ggsave(
-  filename = "Plots/Fig4_adonis_drivers_beige_green.png",
+  filename = "Plots/Updated/Fig4_adonis_drivers_beige_green.tiff",
   plot     = adonis_plot,
-  width    = 9,
-  height   = 6.5,
-  dpi      = 600,
+  width    = 150,
+  height   = 120,
+  units    = "mm",
+  dpi      = 300,
+  device   = agg_tiff,
+  compression = "lzw",
   bg       = "white"
 )
-
