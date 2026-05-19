@@ -1,219 +1,285 @@
-### SPRUCE Litter decomposition 2015-2017 
+### SPRUCE Litter decomposition 2015-2017
 ## Fig 3 - Transformations
+## Revised layout for clearer GCA-style presentation
 
 library(tidyverse)
 library(ggplot2)
 library(patchwork)
-library(viridisLite)
+library(ragg)
+library(scales)
 
-## input data: 
-transformations_summary_df <- read.csv("Input/Metabodirect_All_Sum_Time/6_transformations/Transformations_summary_counts.csv")
+## input data -------------------------------------------------------------
+transformations_summary_df <- read.csv(
+  "Input/Metabodirect_All_Sum_Time/6_transformations/Transformations_summary_counts.csv"
+)
 metadata <- read.csv("Input/metadata.csv")
 
-# Make sure Time is numeric
+## custom labels for facets ----------------------------------------------
+custom_labels_facet <- c(
+  ANG = "italic('S. angustifolium')",
+  MAG = "italic('S. magellanicum')",
+  SPL = "'Spruce needles'",
+  SPR = "'Spruce roots'",
+  LTL = "'Labrador tea leaves'",
+  LTR = "'Labrador tea roots'"
+)
+
+## time variable ----------------------------------------------------------
 metadata <- metadata %>%
-  mutate(Time = recode(Pickup_t,
-                       "T_0"   = 0,
-                       "T_0.5" = 0.5,
-                       "T_1"   = 1,
-                       "T_2"   = 2))
+  mutate(
+    Time = recode(
+      Pickup_t,
+      "T_0"   = 0,
+      "T_0.5" = 0.5,
+      "T_1"   = 1,
+      "T_2"   = 2
+    )
+  )
 
-# Merge transformation df with metadata
+time_breaks <- c(0, 0.5, 1, 2)
+
+## merge ------------------------------------------------------------------
 trans_df <- transformations_summary_df %>%
-  left_join(metadata %>% select(SampleID, Litter, Time),
-            by = "SampleID")
+  left_join(
+    metadata %>% select(SampleID, Litter, Time),
+    by = "SampleID"
+  )
 
-
-## Summarize Groups per sample (using Perc_Counts)
-# Collapse to Group level within each sample
+## summarize groups per sample -------------------------------------------
 group_per_sample <- trans_df %>%
   group_by(SampleID, Litter, Time, Group) %>%
-  summarise(Perc = sum(Perc_Counts),
-            .groups = "drop")
+  summarise(
+    Perc = sum(Perc_Counts),
+    .groups = "drop"
+  )
 
-
-## Panel A: Groups × Time (all litters combined) -----
+## Panel A: Groups x Time -------------------------------------------------
 group_time <- group_per_sample %>%
   group_by(Time, Group) %>%
-  summarise(MeanPerc = mean(Perc),
-            SDPerc   = sd(Perc),
-            .groups  = "drop")
+  summarise(
+    MeanPerc = mean(Perc),
+    .groups  = "drop"
+  ) %>%
+  mutate(Time = factor(Time, levels = time_breaks))
 
-pA_overall <- ggplot(group_time,
-                     aes(x = factor(Time),
-                         y = MeanPerc,
-                         fill = Group)) +
-  geom_col(color = "black", linewidth = 0.2) +
+pA_overall <- ggplot(
+  group_time,
+  aes(x = Time, y = MeanPerc, fill = Group)
+) +
+  geom_col(color = "black", linewidth = 0.2, width = 0.9) +
+  scale_y_continuous(
+    breaks = c(0, 0.25, 0.5, 0.75, 1),
+    limits = c(0, 1),
+    expand = c(0, 0)
+  ) +
   labs(
     title = "A) Transformation groups over time",
     x     = "Time (years)",
-    y     = "Tranformation Relative Abundance"
+    y     = "Transformation relative abundance"
   ) +
-  theme_bw(base_size = 10) +
+  theme_bw(base_size = 8) +
   theme(
-    plot.title = element_text(hjust = 0, face = "bold"),
+    plot.title       = element_text(hjust = 0, face = "bold"),
     panel.grid.minor = element_blank(),
-    legend.position = "none"
+    legend.position  = "right",
+    legend.title     = element_text(size = 8, margin = margin(b = 2)),
+    legend.text      = element_text(size = 7),
+    legend.key.size  = unit(4, "mm")
   ) +
   scale_fill_brewer(palette = "Set2")
-pA_overall
 
-## Panel B: Groups × Litter × Time ------
-# Manually specify litter order
+## Panel B: Groups x Litter x Time ---------------------------------------
 litter_order <- c("ANG", "MAG", "SPL", "SPR", "LTL", "LTR")
 
 group_litter_time <- group_per_sample %>%
   group_by(Litter, Time, Group) %>%
-  summarise(MeanPerc = mean(Perc),
-            SDPerc   = sd(Perc),
-            .groups  = "drop") %>%
+  summarise(
+    MeanPerc = mean(Perc),
+    .groups  = "drop"
+  ) %>%
   mutate(
-    Litter = factor(Litter, levels = litter_order)
+    Litter = factor(Litter, levels = litter_order),
+    Time   = factor(Time, levels = time_breaks)
   )
 
-pB_litter <- ggplot(group_litter_time,
-                    aes(x = factor(Time),
-                        y = MeanPerc,
-                        fill = Group)) +
-  geom_col(color = "black", linewidth = 0.2) +
-  facet_wrap(~ Litter, ncol = 3) +
+pB_litter <- ggplot(
+  group_litter_time,
+  aes(x = Time, y = MeanPerc, fill = Group)
+) +
+  geom_col(color = "black", linewidth = 0.2, width = 0.9) +
+  facet_wrap(
+    ~ Litter,
+    ncol = 3,
+    labeller = as_labeller(custom_labels_facet, label_parsed)
+  ) +
+  scale_y_continuous(
+    breaks = c(0, 0.25, 0.5, 0.75, 1),
+    limits = c(0, 1),
+    expand = c(0, 0)
+  ) +
   labs(
-    title = "B) Transformation groups by litter type",
+    title = "B) Transformation groups by litter",
     x     = "Time (years)",
-    y     = "Tranformation Relative Abundance"
+    y     = "Transformation relative abundance"
   ) +
-  theme_bw(base_size = 10) +
+  theme_bw(base_size = 8) +
   theme(
-    plot.title      = element_text(hjust = 0, face = "bold"),
-    strip.text      = element_text(face = "bold"),
+    plot.title       = element_text(hjust = 0, face = "bold"),
+    strip.text       = element_text(size = 7),
     strip.background = element_rect(fill = "grey95"),
-    panel.grid.minor = element_blank()
-  ) +
+    panel.grid.minor = element_blank(),
+    panel.grid.major = element_blank(),
+    legend.position  = "none", 
+    plot.margin    = margin(t = 5, r = 0, b = 5, l = 5)) +
   scale_fill_brewer(palette = "Set2")
-pB_litter
 
-## Major groups: Abiotic & Sugar -----
+## Major groups: Abiotic and Amino Acid ----------------------------------
 major_groups <- trans_df %>%
-  filter(Group %in% c("Abiotic","Amino Acid")) %>%
+  filter(Group %in% c("Abiotic", "Amino Acid")) %>%
   group_by(SampleID, Litter, Time, Group, Transformation) %>%
-  summarise(Perc = sum(Perc_Counts),
-            .groups = "drop")
+  summarise(
+    Perc = sum(Perc_Counts),
+    .groups = "drop"
+  )
 
 major_trans <- major_groups %>%
   group_by(Group, Transformation, Time) %>%
   summarise(
     MeanPerc = mean(Perc),
-    SDPerc   = sd(Perc),
     .groups  = "drop"
   ) %>%
-  group_by(Group, Time) %>%
-  arrange(desc(MeanPerc), .by_group = TRUE) %>%
-  mutate(Transformation_sorted = factor(Transformation,
-                                        levels = unique(Transformation))) %>%
   ungroup()
 
-abiotic_df <- major_trans %>% filter(Group == "Abiotic")
-sugar_df   <- major_trans %>% filter(Group == "Sugar")
-amino_df <- major_trans %>% filter(Group == "Amino Acid")
+abiotic_df <- major_trans %>%
+  filter(Group == "Abiotic")
 
-## Panel C: Abiotic transformations over time ---------
-pC_abiotic <- ggplot(abiotic_df,
-                     aes(x = factor(Time),
-                         y = MeanPerc,
-                         fill = Transformation_sorted)) +
-  geom_col(color = "black", linewidth = 0.2) +
+amino_df <- major_trans %>%
+  filter(Group == "Amino Acid")
+
+## reorder transformations by overall abundance --------------------------
+abiotic_order <- abiotic_df %>%
+  group_by(Transformation) %>%
+  summarise(total = mean(MeanPerc), .groups = "drop") %>%
+  arrange(total) %>%
+  pull(Transformation)
+
+amino_order <- amino_df %>%
+  group_by(Transformation) %>%
+  summarise(total = mean(MeanPerc), .groups = "drop") %>%
+  arrange(total) %>%
+  pull(Transformation)
+
+abiotic_df <- abiotic_df %>%
+  mutate(
+    Time = factor(Time, levels = time_breaks),
+    Transformation = factor(Transformation, levels = abiotic_order)
+  )
+
+amino_df <- amino_df %>%
+  mutate(
+    Time = factor(Time, levels = time_breaks),
+    Transformation = factor(Transformation, levels = amino_order)
+  )
+
+## common heatmap theme ---------------------------------------------------
+heatmap_theme <- theme_bw(base_size = 8) +
+  theme(
+    plot.title       = element_text(hjust = 1, face = "bold"),
+    panel.grid      = element_blank(),
+    axis.text.y     = element_text(size = 7),
+    axis.text.x     = element_text(size = 8),
+    legend.position = "bottom",
+    legend.title    = element_text(size = 7, margin = margin(b = 2)),
+    legend.text     = element_text(size = 7),
+    legend.key.width = unit(12, "mm"),
+    legend.key.height = unit(3, "mm"),
+    plot.margin     = margin(t = 5, r = 2, b = 2, l = 5)
+  )
+
+## Panel C: Abiotic heatmap ----------------------------------------------
+pC_abiotic <- ggplot(
+  abiotic_df,
+  aes(x = Time, y = Transformation, fill = MeanPerc)
+) +
+  geom_tile(color = "white", linewidth = 0.2) +
+  scale_fill_viridis_c(
+    option = "C",
+    name   = "Relative abundance"
+  ) +
   labs(
     title = "C) Abiotic transformations",
     x     = "Time (years)",
-    y     = "Tranformation Relative Abundance"
+    y     = NULL
   ) +
-  theme_bw(base_size = 10) +
-  theme(
-    plot.title      = element_text(hjust = 0, face = "bold"),
-    panel.grid.minor = element_blank()
-  ) +
-  scale_fill_viridis_d(option = "C",
-                       name = "Transformation")+
-  guides(fill = guide_legend(ncol = 4))
-pC_abiotic
+  heatmap_theme +
+  guides(
+    fill = guide_colorbar(
+      title.position = "top",
+      barwidth = unit(30, "mm"),
+      barheight = unit(3, "mm")
+    )
+  )
 
-## Panel D: Sugar-related transformations over time
-pD_amino <- ggplot(amino_df,
-                   aes(x = factor(Time),
-                       y = MeanPerc,
-                       fill = Transformation_sorted)) +
-  geom_col(color = "black", linewidth = 0.2) +
+## Panel D: Amino acid-related heatmap -----------------------------------
+pD_amino <- ggplot(
+  amino_df,
+  aes(x = Time, y = Transformation, fill = MeanPerc)
+) +
+  geom_tile(color = "white", linewidth = 0.2) +
+  scale_fill_viridis_c(
+    option = "D",
+    name   = "Relative abundance"
+  ) +
   labs(
-    title = "D) Amino Acid-related transformations",
+    title = "D) Amino acid-related transformations",
     x     = "Time (years)",
-    y     = "Tranformation Relative Abundance"
+    y     = NULL
   ) +
-  theme_bw(base_size = 10) +
-  theme(
-    plot.title      = element_text(hjust = 0, face = "bold"),
-    panel.grid.minor = element_blank()
-  ) +
-  scale_fill_viridis_d(option = "D",
-                       name = "Transformation")+
-  guides(fill = guide_legend(ncol = 3))
-pD_amino
+  heatmap_theme +
+  guides(
+    fill = guide_colorbar(
+      title.position = "top",
+      barwidth = unit(30, "mm"),
+      barheight = unit(3, "mm")
+    )
+  )
 
-## Fig 3 -------
+## layout -----------------------------------------------------------------
+library(cowplot) 
+## Top row with A and B (no patchwork)
+empty_plot <- ggplot() + theme_void()
+top_row <- cowplot::plot_grid(
+  empty_plot, pA_overall, pB_litter, 
+  nrow       = 1,
+  rel_widths = c(0.2, 1, 1.5),  # last slot has almost no width
+  align      = "v",
+  axis       = "lr"
+)
+bottom_row <- cowplot::plot_grid(
+  pC_abiotic, pD_amino,
+  nrow       = 1,
+  rel_widths = c(1, 1),
+  align      = "v",
+  axis       = "lr"
+)
 
-pC_abiotic_for_legend <- pC_abiotic +
-  theme(
-    legend.position   = "bottom",
-    legend.title      = element_text(size = 7),
-    legend.text       = element_text(size = 7),
-    legend.key.size   = unit(0.3, "lines"),
-    legend.margin     = margin(t = 1, r = 1, b = 1, l = 1)
-  ) +
-  guides(fill = guide_legend(ncol = 3))
+fig3_cow <- cowplot::plot_grid(
+  top_row,
+  bottom_row,
+  ncol        = 1,
+  rel_heights = c(1, 1.5),
+  align       = "v"
+)
+fig3_cow
 
-# Extract the legend as a grob
-legend_C <- cowplot::get_legend(pC_abiotic_for_legend)
+ggsave(
+  "Plots/Updated/Fig3_transformations_cowplot.tiff",
+  fig3_cow,
+  width       = 190,
+  height      = 200,
+  units       = "mm",
+  dpi         = 300,
+  device      = agg_tiff,bg = "white",
+  compression = "lzw"
+)
 
-# Create a version of the plot WITHOUT legend
-pC_abiotic_noleg <- pC_abiotic +
-  theme(legend.position = "none")
-legend_C_wrap <- patchwork::wrap_elements(legend_C)
-
-pC_amino_for_legend <- pD_amino +
-  theme(
-    legend.position   = "bottom",
-    legend.title      = element_text(size = 7),
-    legend.text       = element_text(size = 7),
-    legend.key.size   = unit(0.3, "lines"),
-    legend.margin     = margin(t = 1, r = 1, b = 1, l = 1)
-  ) +
-  guides(fill = guide_legend(ncol = 3))
-# 
-# Extract the legend as a grob
-legend_D <- cowplot::get_legend(pC_amino_for_legend)
-
-# Create a version of the plot WITHOUT legend
-pD_amino_noleg <- pD_amino +
-  theme(legend.position = "none")
-
-legend_D_wrap <- patchwork::wrap_elements(legend_D)
-
-
-
-
-top <- (pA_overall + plot_spacer() + pB_litter) +
-  plot_layout(widths = c(1, 0.3, 1))
-
-bottom <- (pD_amino_noleg + plot_spacer() + legend_D_wrap) +
-  plot_layout(widths = c(0.5, 0.1, 0.4))   
-
-middle <- (pC_abiotic_noleg + plot_spacer() + legend_C_wrap) +
-  plot_layout(widths = c(0.5, 0.1, 0.4))   
-
-full <- (top / middle / bottom) +
-  plot_layout(heights = c(1, 0.8, 0.8))  
-
-full
-
-ggsave("Plots/Fig3_transformations.png",
-       full,
-       width = 350, height = 250, units = "mm", dpi = 600)

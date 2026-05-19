@@ -1,11 +1,15 @@
 ### SPRUCE Litter Decomposition Study 2015 - 2018
 ## Bulk Characterization
+## Author: Ghiwa Makke
 
 library(tidyverse)
 library(ggpubr)
 library(rstatix)
 library(forcats)
 library(readxl)
+library(ragg)
+
+theme_set(theme_classic(base_size = 12, base_family = "Arial"))
 
 # Read data ---------------------------------------------------------------
 df <- read_xlsx("Input/SPRUCE_decomposition_chem_data.xlsx")
@@ -25,13 +29,24 @@ my_colors <- c(
   "SPR" = "#1b9e77"
 )
 
+# Facet labels: parsed strings
 custom_labels <- c(
-  "MAG" = "S. magellanicum",
-  "ANG" = "S. angustifolium",
-  "SPR" = "Spruce roots",
-  "LTR" = "Labrador tea roots",
-  "LTL" = "Labrador tea leaves",
-  "SPL" = "Spruce needles"
+  MAG = "italic('S. magellanicum')",
+  ANG = "italic('S. angustifolium')",
+  SPR = "'Spruce roots'",
+  LTR = "'Labrador tea roots'",
+  LTL = "'Labrador tea leaves'",
+  SPL = "'Spruce needles'"
+)
+
+# Axis labels: expression vector
+axis_labels_expr <- c(
+  "MAG" = expression(italic("S. magellanicum")),
+  "SPR" = expression("Spruce roots"),
+  "LTR" = expression("Labrador tea roots"),
+  "ANG" = expression(italic("S. angustifolium")),
+  "SPL" = expression("Spruce needles"),
+  "LTL" = expression("Labrador tea leaves")
 )
 
 # Decomposition Rate ------------------------------------------------------
@@ -44,9 +59,12 @@ data_k <- df %>%
 data_k <- data_k %>%
   mutate(
     M0 = 100,
-    #k0.5 = -log(T_0.5 / M0) / 252,   # 0–0.5 yr (not used here)
-    #k1   = -log(T_1   / M0) / 384,   # 0–1 yr (not used here)
-    k2   = -log(T_2   / M0) / 740    # 0–2 yr
+    #k0.5 = -log(T_0.5 / M0) / 252,   # 0-0.5 yr (not used here)
+    #k1   = -log(T_1   / M0) / 384,   # 0-1 yr (not used here)
+    k2   = -log(T_2   / M0) / 740    # 0-2 yr
+  ) %>%
+  mutate(
+    CO2 = factor(CO2, levels = c("aCO2", "eCO2"))
   )
 
 # Long format for rate comparisons ----------------------------------------
@@ -68,31 +86,34 @@ meta_with_cn <- df %>%
     Litter    = factor(Litter, levels = decomp_order)
   )
 
-
-# PANEL A (for Sup Fig 1): Temp × CO2 × Litter line plot of k2 ------
+# PANEL A (for Sup Fig 1): Temp x CO2 x Litter line plot of k2 ------
 
 fig1A <- ggplot(
   data_k,
   aes(x = Temp, y = k2,
       group = interaction(Litter, CO2),
-      color = as.factor(CO2))
+      color = CO2)
 ) +
   geom_line(alpha = 0.7) +
   geom_point(size = 2) +
-  facet_wrap(~ Litter,
-             labeller = labeller(Litter = as_labeller(custom_labels))) +
+  facet_wrap(
+    ~ Litter,
+    labeller = as_labeller(custom_labels, label_parsed)
+  ) +
   labs(
-    x     = "Temperature (°C)",
-    y     = "Decomposition rate (k/day)",
-    color = "CO₂ treatment"
+    x = "Temperature (°C)",
+    y = "Decomposition rate (k/day)"
+  ) +
+  scale_color_manual(
+    values = c("aCO2" = "#1f78b4", "eCO2" = "#e31a1c"),
+    labels = c("aCO2" = "Ambient", "eCO2" = "Elevated"),
+    name   = expression(CO[2]~treatment)
   ) +
   theme_classic(base_size = 12) +
   theme(
-    legend.position = "bottom",
-    strip.text      = element_text(face = "bold")
+    legend.position = "bottom"
   )
-
-
+fig1A
 # EFFECT SIZE: export as TABLE ------
 
 # Prepare data for effect-size model
@@ -118,9 +139,9 @@ eta_tbl <- effectsize::eta_squared(
     Parameter_clean = recode(Parameter,
                              "Litter" = "Litter",
                              "Temp_f" = "Temp",
-                             "CO2_f"  = "CO₂"),
+                             "CO2_f"  = "CO2"),
     Parameter_clean = factor(Parameter_clean,
-                             levels = c("Litter", "Temp", "CO₂"))
+                             levels = c("Litter", "Temp", "CO2"))
   )
 
 # Create a clean table for export (Supplementary Table)
@@ -131,55 +152,62 @@ eta_table_export <- eta_tbl %>%
          CI_high) %>%
   arrange(desc(Eta2_partial))
 
-# Export as CSV 
+# Export as CSV
 readr::write_csv(
   eta_table_export,
   "Tables/SuppTable_effect_sizes_k_partial_eta2.csv"
 )
 
-
 # PANEL 1A: Decomposition rate boxplot (by litter) -----
 
+fig1C_dat <- data_long %>%
+  filter(Rate == "k2") %>%
+  mutate(
+    Litter = fct_reorder(Litter, Decomposition, .fun = median, na.rm = TRUE)
+  )
+
+fig1C_breaks <- levels(fig1C_dat$Litter)
+
 fig1C <- ggplot(
-  data_long %>% filter(Rate == "k2"),
-  aes(x = fct_reorder(Litter, Decomposition, .fun = median, na.rm = TRUE),
-      y = Decomposition,
-      fill = Litter)
+  fig1C_dat,
+  aes(x = Litter, y = Decomposition, fill = Litter)
 ) +
   geom_boxplot(alpha = 0.85) +
-  scale_x_discrete(labels = custom_labels) +
+  scale_x_discrete(
+    breaks = fig1C_breaks,
+    labels = axis_labels_expr[fig1C_breaks]
+  ) +
   scale_fill_manual(values = my_colors) +
   labs(
     x = NULL,
-    y = "Decomposition rate (k,/day)"
+    y = "Decomposition rate (k/day)"
   ) +
-  theme_classic(base_size = 12) +
+  theme_classic(base_size = 12, base_family = "Arial") +
   theme(
     axis.text.x     = element_text(angle = 25, vjust = 1, hjust = 1),
     legend.position = "none"
   )
-
-
-# PANEL 1B C:N ratio boxplot---------
+fig1C
+# PANEL 1B: C:N ratio boxplot---------
 
 fig1D <- ggplot(meta_with_cn,
                 aes(x = Litter, y = C_N_ratio, fill = Litter)) +
   geom_boxplot(outlier.shape = NA, alpha = 0.9) +
-  # geom_jitter(width = 0.2, alpha = 0.5,
-  #             color = "black", size = 1.8) +
   scale_fill_manual(values = my_colors) +
-  scale_x_discrete(labels = custom_labels) +
+  scale_x_discrete(
+    breaks = decomp_order,
+    labels = axis_labels_expr[decomp_order]
+  ) +
   labs(
     x = NULL,
     y = "Initial C:N ratio"
   ) +
-  theme_classic(base_size = 12) +
+  theme_classic(base_size = 12, base_family = "Arial") +
   theme(
     axis.text.x     = element_text(angle = 25, vjust = 1, hjust = 1),
     legend.position = "none"
   )
-
-
+fig1D
 # Main Fig 1 ------
 
 fig1_main <- ggpubr::ggarrange(
@@ -193,19 +221,21 @@ fig1_main <- ggpubr::ggarrange(
 fig1_main
 
 ggsave(
-  "Plots/Figure1_main_k_CNR.png",
-  plot   = fig1_main,
-  dpi    = 300,
-  width  = 7.5,
-  height = 3.8
+  "Plots/Updated/Figure1.tiff",
+  plot        = fig1_main,
+  dpi         = 300,
+  width       = 190,
+  height      = 96,
+  units       = "mm",
+  device      = "tiff",
+  compression = "lzw"
 )
 
 # SUPPLEMENTARY FIGURE 1 ------
-#   A: Temp × CO₂ × Litter, k2
+#   A: Temp x CO2 x Litter, k2
 #   B: initial %C
 #   C: initial %N
 #   D: initial %P
-
 
 # Initial averages per litter ---------------------------------------------
 df_initial <- df %>%
@@ -257,10 +287,16 @@ p_init_C <- ggplot(stats_C,
   geom_errorbar(aes(ymin = Mean - SE, ymax = Mean + SE),
                 width = 0.2) +
   scale_fill_manual(values = my_colors) +
+  scale_x_discrete(
+    breaks = levels(stats_C$Litter),
+    labels = axis_labels_expr[levels(stats_C$Litter)]
+  ) +
   labs(x = NULL, y = "%C") +
   theme_classic(base_size = 11) +
-  theme(axis.text.x = element_text(angle = 25, vjust = 1, hjust = 1),
-        legend.position = "none")
+  theme(
+    axis.text.x = element_text(angle = 30, vjust = 1, hjust = 1),
+    legend.position = "none"
+  )
 
 p_init_N <- ggplot(stats_N,
                    aes(x = Litter, y = Mean, fill = Litter)) +
@@ -268,10 +304,16 @@ p_init_N <- ggplot(stats_N,
   geom_errorbar(aes(ymin = Mean - SE, ymax = Mean + SE),
                 width = 0.2) +
   scale_fill_manual(values = my_colors) +
+  scale_x_discrete(
+    breaks = levels(stats_N$Litter),
+    labels = axis_labels_expr[levels(stats_N$Litter)]
+  ) +
   labs(x = NULL, y = "%N") +
   theme_classic(base_size = 11) +
-  theme(axis.text.x = element_text(angle = 25, vjust = 1, hjust = 1),
-        legend.position = "none")
+  theme(
+    axis.text.x = element_text(angle = 30, vjust = 1, hjust = 1),
+    legend.position = "none"
+  )
 
 p_init_P <- ggplot(stats_P,
                    aes(x = Litter, y = Mean, fill = Litter)) +
@@ -279,20 +321,30 @@ p_init_P <- ggplot(stats_P,
   geom_errorbar(aes(ymin = Mean - SE, ymax = Mean + SE),
                 width = 0.2) +
   scale_fill_manual(values = my_colors) +
+  scale_x_discrete(
+    breaks = levels(stats_P$Litter),
+    labels = axis_labels_expr[levels(stats_P$Litter)]
+  ) +
   labs(x = NULL, y = "%P") +
   theme_classic(base_size = 11) +
-  theme(axis.text.x = element_text(angle = 25, vjust = 1, hjust = 1),
-        legend.position = "none")
-
-# --- Supplementary Figure 1 layout update ---
-# Row 1: panel A (fig1A)
-# Row 2: panels B–D (p_init_C, p_init_N, p_init_P)
+  theme(
+    axis.text.x = element_text(angle = 30, vjust = 1, hjust = 1),
+    legend.position = "none"
+  )
 
 row2_supp1 <- ggpubr::ggarrange(
   p_init_C, p_init_N, p_init_P,
   ncol   = 3,
   nrow   = 1,
-  labels = c("B", "C", "D")  # bottom row labels
+  labels = c("B", "C", "D")
+)
+
+supp_fig1 <- ggpubr::ggarrange(
+  fig1A,
+  row2_supp1,
+  ncol    = 1,
+  nrow    = 2,
+  heights = c(1.5, 1)
 )
 
 supp_fig1 <- ggpubr::ggarrange(
@@ -305,17 +357,20 @@ supp_fig1 <- ggpubr::ggarrange(
 
 supp_fig1
 
-ggsave("Plots/SupFig1_tempCO2_k_plus_initial_CNP.png",
-       plot   = supp_fig1,
-       dpi    = 300,
-       width  = 7.5,
-       height = 6.5)
 
+ggsave(
+  "Plots/Updated/SupFig1.tiff",
+  plot        = supp_fig1,
+  dpi         = 300,
+  width       = 190,
+  height      = 170,
+  units       = "mm",
+  device      = "tiff",
+  compression = "lzw"
+)
 
+# SUPPLEMENTARY FIGURE 2 - Percent Change ------------
 
-# SUPPLEMENTARY FIGURE 2 – Percent Change  ------------
-
-# Percent Change ----------------------------------------------------------
 df_initial <- df %>% filter(Pickup_t == "T_0")
 
 average_values <- df_initial %>%
@@ -323,7 +378,7 @@ average_values <- df_initial %>%
   summarise(across(c("percent_mass", "percent_C", "percent_N",
                      "percent_P", "percent_carbs", "percent_aromatics"),
                    mean, na.rm = TRUE),
-            .groups = 'drop')
+            .groups = "drop")
 
 average_values <- average_values %>%
   rename_with(~ paste0("Initial_", .), -Litter)
@@ -369,6 +424,10 @@ supp2_CNP <- ggplot(df_long_CNP,
                     aes(x = Litter, y = Change, fill = Litter)) +
   geom_boxplot(alpha = 0.9, outlier.size = 0.6) +
   scale_fill_manual(values = my_colors) +
+  scale_x_discrete(
+    breaks = decomp_order,
+    labels = axis_labels_expr[decomp_order]
+  ) +
   facet_wrap(~ Metric, scales = "free_y") +
   labs(
     x = "Litter type",
@@ -376,7 +435,9 @@ supp2_CNP <- ggplot(df_long_CNP,
   ) +
   theme_bw(base_size = 11) +
   theme(
-    axis.text.x     = element_text(angle = 25, vjust = 1, hjust = 1),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+      axis.text.x     = element_text(angle = 35, vjust = 1, hjust = 1),
     legend.position = "none",
     strip.text      = element_text(face = "bold")
   )
@@ -392,10 +453,10 @@ my_colors_bulk <- c(
 )
 
 litter_labels_bulk <- c(
-  "ANG" = "ANG (S. angustifolium)",
-  "MAG" = "MAG (S. magellanicum)",
-  "SPL" = "SPL (Spruce needles)",
-  "LTL" = "LTL (Labrador tea leaves)"
+  ANG = expression(paste("ANG (", italic("S. angustifolium"), ")")),
+  MAG = expression(paste("MAG (", italic("S. magellanicum"), ")")),
+  SPL = expression("SPL (Spruce needles)"),
+  LTL = expression("LTL (Labrador tea leaves)")
 )
 
 parse_time <- function(x) as.numeric(gsub("^T_", "", x))
@@ -436,7 +497,7 @@ sum_bulk <- Bulk_df %>%
     sd_measure   = sd(percent,   na.rm = TRUE),
     se_measure   = sd_measure / sqrt(n),
     .groups      = "drop"
-  )%>%
+  ) %>%
   filter(!is.na(Litter))
 
 facet_labels_bulk <- c(
@@ -487,7 +548,7 @@ supp2_bulk <- ggplot(
   ) +
   guides(color = guide_legend(order = 1),
          fill  = guide_legend(order = 1)) +
-  theme_bw(base_size = 11) +
+  theme_bw(base_size = 11, base_family = "Arial") +
   theme(
     panel.grid       = element_blank(),
     strip.text       = element_text(face = "bold"),
@@ -500,10 +561,18 @@ supp_fig2 <- ggpubr::ggarrange(
   ncol    = 1,
   nrow    = 2,
   labels  = c("A", "B"),
-  heights = c(1, 1)
+  heights = c(1.3, 1)
 )
+
 supp_fig2
 
-
-ggsave("Plots/SuppFig2_percent_change_CNP_and_bulk_carbs_aromatics.png",
-       plot = supp_fig2, dpi = 300, width = 7, height = 5.5)
+ggsave(
+  "Plots/Updated/SuppFig2.tiff",
+  plot        = supp_fig2,
+  dpi         = 300,
+  width       = 190,
+  height      = 160,
+  units       = "mm",
+  device      = "tiff",
+  compression = "lzw"
+)

@@ -198,6 +198,17 @@ time_colors <- c(
   "T_2"   = "#503A2C"
 )
 
+strip_labels <- c(
+  AminoSugar     = "Amino Sugar",
+  Carbohydrate   = "Carbohydrate",
+  CondensedHC    = "Condensed HC",
+  Lignin         = "Lignin",
+  Lipid          = "Lipid",
+  Other          = "Other",
+  Peptide        = "Peptide",
+  Tannin         = "Tannin",
+  Unsaturated_HC = "Unsaturated HC"
+)
 
 #my_colors <- c("#4DBBD5", "#3C5488", "#B09C85", "#7E6148")
 
@@ -231,7 +242,12 @@ shannon_plot <- ggplot(all_pivoted_shannon,
     values = time_colors,
     guide  = "none"
   ) +
-  facet_wrap(~ Type, scales = "free")
+  facet_wrap(
+    ~ Type,
+    scales  = "free_y",
+    ncol    = 3,
+    labeller = labeller(Type = strip_labels)
+  )
 
 shannon_plot
 
@@ -240,3 +256,16 @@ ggsave("Plots/Fig5_ANG_shannon.png",
        width  = 8,
        height = 4.5,
        dpi    = 300)
+
+
+# Export TIFF in GCA style
+ggsave(
+  "Plots/Updated/Figure5.tiff",
+  plot   = shannon_plot,
+  width  = 190,
+  height = 120,
+  units  = "mm",
+  dpi    = 300,
+  device = agg_tiff,
+  compression = "lzw"
+)

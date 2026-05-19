@@ -1,11 +1,16 @@
 ### SPRUCE Litter decomposition 2015 - 2017
 ### Figure 2 - Overall metabolic varaition and trajectory analysis
+## Author: Ghiwa Makke
+
+### SPRUCE Litter decomposition 2015 - 2017
+### Figure 2 - Overall metabolic variation and trajectory analysis
 
 ## Load packages & settings
 library(tidyverse)
 library(vegan)
 library(ecotraj)
 library(patchwork)
+library(ragg)
 
 ## Custom colors 
 my_colors <- c(
@@ -17,18 +22,40 @@ my_colors <- c(
   "SPR" = "#1b9e77"
 )
 
+## Facet / axis labels
 custom_labels <- c(
-  "MAG" = "S. magellanicum",
-  "ANG" = "S. angustifolium",
-  "SPR" = "Spruce roots",
-  "LTR" = "Labrador tea roots",
-  "LTL" = "Labrador tea leaves",
-  "SPL" = "Spruce needles"
+  "MAG" = "italic('S. magellanicum')",
+  "ANG" = "italic('S. angustifolium')",
+  "SPR" = "'Spruce roots'",
+  "LTR" = "'Labrador tea roots'",
+  "LTL" = "'Labrador tea leaves'",
+  "SPL" = "'Spruce needles'"
+)
+
+axis_labels_expr <- c(
+  "MAG" = expression(italic("S. magellanicum")),
+  "ANG" = expression(italic("S. angustifolium")),
+  "SPR" = expression("Spruce roots"),
+  "LTR" = expression("Labrador tea roots"),
+  "LTL" = expression("Labrador tea leaves"),
+  "SPL" = expression("Spruce needles")
+)
+
+## Legend labels for litter (Figure 2 legends)
+litter_labels_legend <- c(
+  ANG = expression(italic("S. angustifolium")),
+  MAG = expression(italic("S. magellanicum")),
+  SPR = expression("Spruce roots"),
+  LTR = expression("Labrador tea roots"),
+  LTL = expression("Labrador tea leaves"),
+  SPL = expression("Spruce needles")
 )
 
 ## 1. Read & align data -----
-# Intensity matrix: rows = features, columns = samples # output of metabodirect
-mat_input <- readr::read_csv("Input/Metabodirect_All_Sum_Time/1_preprocessing_output/matrix_features.csv", col_types = cols()) 
+mat_input <- readr::read_csv(
+  "Input/Metabodirect_All_Sum_Time/1_preprocessing_output/matrix_features.csv",
+  col_types = cols()
+)
 meta <- readr::read_csv("Input/metadata.csv", col_types = cols()) %>%
   mutate(SampleID = as.character(SampleID))
 
@@ -46,11 +73,10 @@ meta <- meta %>%
     Time_yrs  = unname(time_map[as.character(Pickup_t)]),
     Litter    = factor(Litter)
   )
+
 ## 2. Distance + PCoA on samples -----
-# Bray–Curtis dissimilarity
 bc_dist <- vegdist(mat, method = "bray")
 
-# PCoA via cmdscale (metric MDS)
 pcoa_res <- cmdscale(bc_dist, k = 2, eig = TRUE, add = TRUE)
 
 pcoa_scores <- as.data.frame(pcoa_res$points[, 1:2])
@@ -58,12 +84,11 @@ colnames(pcoa_scores) <- c("Axis1", "Axis2")
 
 var_explained <- pcoa_res$eig[1:2] / sum(pcoa_res$eig) * 100
 
-# Add metadata to PCoA coordinates
 pcoa_scores$SampleID <- rownames(mat)
 pcoa_scores <- pcoa_scores %>%
   left_join(meta, by = "SampleID")
 
-## 3. Litter × time centroids -------
+## 3. Litter x time centroids -------
 pcoa_centroids <- pcoa_scores %>%
   group_by(Litter, Time_yrs) %>%
   summarise(
@@ -114,7 +139,6 @@ surveys_cent <- as.integer(factor(pcoa_centroids_interp$Time_yrs,
 times_cent   <- pcoa_centroids_interp$Time_yrs
 
 ## 7. ecotraj trajectory metrics ----------
-# 7.1 Path lengths (total length per litter)
 lengths_cent <- trajectoryLengths2D(
   xy      = xy_cent,
   sites   = sites_cent,
@@ -127,7 +151,6 @@ lengths_cent_df <- as.data.frame(lengths_cent) %>%
   rownames_to_column("Litter") %>%
   rename(total_length = Path)
 
-# 7.2 Speeds (distance per unit time)
 speeds_cent <- trajectorySpeeds2D(
   xy      = xy_cent,
   sites   = sites_cent,
@@ -139,8 +162,7 @@ speeds_cent_df <- as.data.frame(speeds_cent) %>%
   rownames_to_column("Litter") %>%
   rename(path_speed = Path)
 
-# 7.3 Build full trajectories object (for convergence classification)
-dist_cent <- dist(xy_cent)  # Euclidean distance between centroid states
+dist_cent <- dist(xy_cent)
 
 traj_cent <- defineTrajectories(
   d     = dist_cent,
@@ -150,12 +172,10 @@ traj_cent <- defineTrajectories(
 
 stopifnot(is.synchronous(traj_cent))
 
-# Bundle key metrics
 traj_metrics_summary <- lengths_cent_df %>%
   left_join(speeds_cent_df, by = "Litter")
 
 ## 8. Convergence diagnostics 
-# 8.1 Mean pairwise distance among centroids at each time
 pairwise_cent <- pcoa_centroids_interp %>%
   inner_join(pcoa_centroids_interp,
              by = "Time_yrs",
@@ -173,11 +193,9 @@ mean_pairwise_cent <- pairwise_cent %>%
     .groups       = "drop"
   )
 
-# remove T0 for plotting panel C 
 mean_pairwise_cent_no0 <- mean_pairwise_cent %>%
   filter(Time_yrs > 0)
 
-# 8.2 Distance to grand centroid 
 grand_centroid_interp <- pcoa_centroids_interp %>%
   group_by(Time_yrs) %>%
   summarise(
@@ -222,7 +240,6 @@ segments_conv <- segments_conv %>%
     )
   )
 
-
 # NMDS --------------------------------------------------------------------
 
 set.seed(123)
@@ -235,7 +252,6 @@ nmds_scores$SampleID <- rownames(mat)
 nmds_scores <- nmds_scores %>%
   left_join(meta, by = "SampleID")
 
-# labels for time
 time_labels <- c(
   "T_0"   = "0 year",
   "T_0.5" = "0.5 year",
@@ -250,8 +266,12 @@ fig2A_NMDS <- ggplot(
       color = Litter,
       shape = Pickup_t)
 ) +
-  geom_point(size = 2.5, alpha = 0.9) +
-  scale_color_manual(values = my_colors, name = "Litter type", labels = custom_labels) +
+  geom_point(size = 2, alpha = 0.9) +
+  scale_color_manual(
+    values = my_colors,
+    name   = "Litter type",
+    labels = litter_labels_legend
+  ) +
   scale_shape_discrete(name = "Collection time",
                        labels = time_labels) +
   labs(
@@ -259,28 +279,27 @@ fig2A_NMDS <- ggplot(
     x = "NMDS1",
     y = "NMDS2"
   ) +
-  theme_bw(base_size = 11) +
+  theme_bw(base_size = 8) +
   theme(
     plot.title      = element_text(hjust = 0, face = "bold"),
-    legend.text = element_text(size = 12),
+    legend.text     = element_text(size = 7),
+    legend.title        = element_text(margin = margin(b = 4)),
+    legend.key.spacing.y = unit(1, "mm"),
+    legend.key.height    = unit(4, "mm"),
     panel.grid.minor = element_blank()
   )
-
+fig2A_NMDS
 ## Panel B: PCoA centroid trajectories w/ convergence coloring
 fig2B_PCoA_conv <- ggplot() +
-  # background sample scores
   geom_point(data = pcoa_scores,
              aes(x = Axis1, y = Axis2),
              color = "gray90", size = 0.8, alpha = 0.4) +
-  # centroid points
   geom_point(data = centroids_with_gc,
              aes(x = Axis1, y = Axis2, fill = Litter),
              shape = 21, size = 3, color = "black", stroke = 0.4) +
-  # time labels
   geom_text(data = centroids_with_gc,
             aes(x = Axis1, y = Axis2, label = Time_yrs),
-            size = 2.2, fontface = "bold", vjust = -0.9) +
-  # arrows colored by convergence/divergence
+            size = 2.3, fontface = "bold", vjust = -0.9) +
   geom_segment(data = segments_conv,
                aes(x = Axis1, y = Axis2,
                    xend = Axis1_next, yend = Axis2_next,
@@ -288,7 +307,11 @@ fig2B_PCoA_conv <- ggplot() +
                    linewidth = lw_scaled),
                arrow = arrow(length = unit(0.15, "cm"), type = "closed"),
                alpha = 0.9) +
-  scale_fill_manual(values = my_colors, name = "Litter type", labels = custom_labels) +
+  scale_fill_manual(
+    values = my_colors,
+    name   = "Litter type",
+    labels = litter_labels_legend
+  ) +
   scale_color_manual(
     values = c(
       "Converging" = "#1f78b4",
@@ -303,12 +326,15 @@ fig2B_PCoA_conv <- ggplot() +
     x     = sprintf("PCoA Axis 1 [%.1f%%]", var_explained[1]),
     y     = sprintf("PCoA Axis 2 [%.1f%%]", var_explained[2])
   ) +
-  theme_bw(base_size = 11) +
+  theme_bw(base_size = 8) +
   theme(
     plot.title      = element_text(hjust = 0, face = "bold"),
     legend.position = "right",
-    legend.text = element_text(size = 12),
-    panel.grid      = element_blank()
+    legend.text     = element_text(size = 7),
+    panel.grid      = element_blank(),
+    legend.title        = element_text(margin = margin(b = 4)),
+    legend.key.spacing.y = unit(1, "mm"),
+    legend.key.height    = unit(4, "mm"),
   )
 
 ## Panel C: Mean pairwise distance among centroids
@@ -326,10 +352,10 @@ fig2C_mean_pair <- ggplot(mean_pairwise_cent_no0,
     x        = "Time (years)",
     y        = "Mean pairwise distance (PCoA space)"
   ) +
-  theme_bw(base_size = 11) +
+  theme_bw(base_size = 7) +
   theme(
-    plot.title      = element_text(hjust = 0.3, face = "bold"),
-    plot.subtitle   = element_text(hjust = 0),
+    plot.title    = element_text(hjust = 0.3, face = "bold"),
+    plot.subtitle = element_text(hjust = 0),
     panel.grid.minor = element_blank()
   )
 
@@ -346,14 +372,17 @@ fig2D_length <- ggplot(traj_metrics_summary,
     x     = "Litter type",
     y     = "Cumulative distance in PCoA space"
   ) +
-  theme_bw(base_size = 11) +
+  theme_bw(base_size = 7) +
   theme(
     plot.title         = element_text(hjust = 0, face = "bold"),
     panel.grid.major.y = element_blank(),
     panel.grid.minor   = element_blank(),
-    axis.text = element_text(size = 12)
-  )+ 
-  scale_x_discrete(labels = custom_labels)
+    axis.text          = element_text(size = 7)
+  ) +
+  scale_x_discrete(
+    labels = axis_labels_expr[levels(reorder(traj_metrics_summary$Litter,
+                                             traj_metrics_summary$total_length))]
+  )
 
 ## Panel E: Mean trajectory speed by litter
 fig2E_speed <- ggplot(traj_metrics_summary,
@@ -368,16 +397,18 @@ fig2E_speed <- ggplot(traj_metrics_summary,
     x     = "Litter type",
     y     = "Speed (distance per year)"
   ) +
-  theme_bw(base_size = 11) +
+  theme_bw(base_size = 7) +
   theme(
     plot.title         = element_text(hjust = 0, face = "bold"),
     panel.grid.major.y = element_blank(),
     panel.grid.minor   = element_blank(),
-    axis.text = element_text(size = 12), 
-    legend.position = "none"
-  )+
-  scale_x_discrete(labels = custom_labels)
-
+    axis.text          = element_text(size = 7),
+    legend.position    = "none"
+  ) +
+  scale_x_discrete(
+    labels = axis_labels_expr[levels(reorder(traj_metrics_summary$Litter,
+                                             traj_metrics_summary$path_speed))]
+  )
 
 ## final multi-panel figure -----------
 row1 <- fig2A_NMDS | fig2B_PCoA_conv
@@ -385,9 +416,16 @@ row2 <- fig2C_mean_pair + fig2D_length + fig2E_speed
 
 Figure2 <- row1 / row2 + plot_layout(heights = c(1.2, 1))
 
-Figure2
+Figure2_ <- fig2A_NMDS / fig2B_PCoA_conv / row2 + plot_layout(heights = c(1.2, 1.2, 1))
 
-ggsave("Plots/Figure2_convergence_trajectories_with_NMDS.png",
-       Figure2,
-       width = 12.5, height = 8.5, dpi = 300)
+ggsave(
+  "Plots/Updated/Figure2.tiff",
+  Figure2,
+  dpi         = 300,
+  width       = 190,
+  height      = 145,
+  units       = "mm",
+  device      = agg_tiff,
+  compression = "lzw"
+)
 
