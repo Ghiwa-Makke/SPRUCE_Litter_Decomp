@@ -221,7 +221,7 @@ shannon_plot <- ggplot(all_pivoted_shannon,
     x = "Collection time (years)",
     y = "Shannon diversity"
   ) +
-  theme_classic() +
+  theme_classic(base_size = 12) +
   scale_x_discrete(labels = c(
     "T_0"   = "0",
     "T_0.5" = "0.5",
@@ -258,11 +258,11 @@ ggsave("Plots/Fig5_ANG_shannon.png",
        dpi    = 300)
 
 
-# Export TIFF in GCA style
+# Export TIFF 
 ggsave(
-  "Plots/Updated/Figure5.tiff",
+  "Plots_frontier/tiff/Figure5.tiff",
   plot   = shannon_plot,
-  width  = 190,
+  width  = 180,
   height = 120,
   units  = "mm",
   dpi    = 300,

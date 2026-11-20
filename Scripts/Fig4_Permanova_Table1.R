@@ -487,18 +487,18 @@ adonis_plot <- ggplot(plot_df, aes(x = Type, y = Factors)) +
     x = "Litter type",
     y = NULL
   ) +
-  theme_minimal(base_size = 10) +
+  theme_minimal(base_size = 12) +
   theme(
-    plot.title       = element_text(hjust = 0, face = "bold", size = 11),
+    plot.title       = element_text(hjust = 0, face = "bold", size = 12),
     axis.text.x      = element_text(face = "bold", angle = 30, hjust = 1, vjust = 1),
     axis.text.y      = element_text(face = "bold", size = 9),
     panel.grid.major = element_blank(),
     panel.grid.minor = element_blank(),
     legend.position  = "right",
     legend.box       = "vertical",
-    legend.text      = element_text(size = 8),
-    legend.title     = element_text(size = 9),
-    plot.margin      = margin(t = 5, r = 2, b = 5, l = 5)
+    legend.text      = element_text(size = 12),
+    legend.title     = element_text(size = 12),
+    #plot.margin      = margin(t = 5, r = 2, b = 5, l = 5)
   ) +
   guides(
     fill = guide_colorbar(
@@ -517,9 +517,9 @@ adonis_plot <- ggplot(plot_df, aes(x = Type, y = Factors)) +
 adonis_plot
 
 ggsave(
-  filename = "Plots/Updated/Fig4_adonis_drivers_beige_green.tiff",
+  filename = "Plots_frontier/tiff/Fig4_adonis_drivers_beige_green.tiff",
   plot     = adonis_plot,
-  width    = 150,
+  width    = 180,
   height   = 120,
   units    = "mm",
   dpi      = 300,

@@ -42,6 +42,7 @@ my_colors <- c(
   "SPR" = "#1b9e77"
 )
 
+
 ## intensity matrix (samples in rows)
 intensity_matrix <- df %>%
   pivot_longer(-Mass, names_to = "SampleID", values_to = "intensity") %>%
@@ -127,7 +128,13 @@ litter_labels_expr <- c(
 )
 
 sum_shannon <- sum_shannon %>%
-  mutate(Litter = factor(Litter, levels = litter_order))
+  mutate(Litter = factor(Litter, levels = litter_order))%>%
+  mutate(Class = case_when(
+    str_detect(Class, regex("^\\s*condense[dn]\\b", ignore_case = TRUE)) ~ "Condensed HC",
+    str_detect(Class, regex("^\\s*unsaturated\\b", ignore_case = TRUE)) ~ "Unsaturated HC",
+    TRUE ~ as.character(Class)
+  )
+  )
 
 p_shannon <- ggplot(
   sum_shannon,
@@ -147,7 +154,19 @@ p_shannon <- ggplot(
     alpha = 0.50,
     color = NA
   ) +
-  facet_wrap(~ Class, scales = "free") +
+  facet_wrap(
+    ~ Class,
+    scales = "free",
+    labeller = labeller(
+      Class = function(x) {
+        case_when(
+          str_to_lower(x) == "Condensed hydrocarbon" ~ "Condensed HC",
+          str_to_lower(x) == "Unsaturated hydrocarbon" ~ "Unsaturated HC",
+          TRUE ~ x
+        )
+      }
+    )
+  ) +
   scale_x_continuous(
     breaks = c(0, 0.5, 1, 2),
     labels = c("0", "0.5", "1", "2")
@@ -176,7 +195,7 @@ p_shannon <- ggplot(
     color = guide_legend(order = 1),
     fill  = guide_legend(order = 1)
   ) +
-  theme_bw(base_size = 10) +
+  theme_bw(base_size = 12) +
   theme(
     panel.grid = element_blank(),
     strip.text = element_text(face = "bold")
@@ -186,9 +205,9 @@ p_shannon
 
 ## export in GCA style
 ggsave(
-  "Plots/Updated/Figure7.tiff",
+  "Plots_frontier/tiff/Figure7.tiff",
   p_shannon,
-  width       = 190,
+  width       = 180,
   height      = 130,
   units       = "mm",
   dpi         = 300,

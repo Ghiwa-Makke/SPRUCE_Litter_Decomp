@@ -230,13 +230,13 @@ bar_plot <- ggplot(
     limits = c(-1, 1)
   ) +
   coord_flip() +
-  theme_classic(base_size = 10) +
+  theme_classic(base_size = 12) +
   theme(
-    axis.text.y = element_text(size = 8, face = "bold"),
-    axis.text.x = element_text(size = 8),
-    axis.title  = element_text(size = 10),
+    axis.text.y = element_text(size = 12, face = "bold"),
+    #axis.text.x = element_text(size = 12),
+    #axis.title  = element_text(size = 10),
     legend.position = "none",
-    plot.title  = element_text(size = 10, face = "bold", hjust = 0.5)
+    plot.title  = element_text(size = 12, face = "bold", hjust = 0.5)
   ) +
   labs(
     title = "Universal",
@@ -302,13 +302,13 @@ heat_plot <- ggplot(heat_df, aes(x = Litter, y = Class, fill = rho)) +
     limits = c(-1, 1),
     name = "Correlation\n(ρ)"
   ) +
-  theme_minimal(base_size = 10) +
+  theme_minimal(base_size = 12) +
   theme(
     panel.grid = element_blank(),
-    axis.text.y = element_text(size = 8, face = "bold"),
-    axis.text.x = element_text(size = 8, face = "bold"),
-    axis.title  = element_text(size = 10),
-    plot.title  = element_text(size = 10, face = "bold", hjust = 0.5)
+    axis.text.y = element_text(size = 12, face = "bold"),
+    axis.text.x = element_text(size = 12, face = "bold"),
+    axis.title  = element_text(size = 12),
+    plot.title  = element_text(size = 12, face = "bold", hjust = 0.5)
   ) +
   labs(
     title = "By litter",
@@ -320,19 +320,19 @@ heat_plot <- ggplot(heat_df, aes(x = Litter, y = Class, fill = rho)) +
 figure_8 <- ggarrange(
   bar_plot,
   heat_plot,
-  nrow = 1,
-  labels = c("A", "B"),
-  widths = c(1, 1.2)
+  nrow = 2,
+  labels = c("A", "B")
+  #widths = c(1, 1.2)
 )
 
 figure_8
 
 
 ggsave(
-  "Plots/Updated/Figure8_MassLoss_vs_ClassCorrelations.tiff",
+  "Plots_frontier/tiff/Figure8_MassLoss_vs_ClassCorrelations.tiff",
   figure_8,
-  width       = 190,
-  height      = 85,
+  width       = 180,
+  height      = 150,
   units       = "mm",
   dpi         = 300,
   device      = agg_tiff,
